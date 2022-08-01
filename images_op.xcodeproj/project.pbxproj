@@ -25,13 +25,10 @@
 		5908C0642894150400B8D037 /* pngset.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BF692894150400B8D037 /* pngset.c */; };
 		5908C0652894150400B8D037 /* egif_lib.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BF6D2894150400B8D037 /* egif_lib.c */; };
 		5908C0662894150400B8D037 /* dgif_lib.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BF6E2894150400B8D037 /* dgif_lib.c */; };
-		5908C0692894150400B8D037 /* qprintf.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BF732894150400B8D037 /* qprintf.c */; };
-		5908C06B2894150400B8D037 /* getarg.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BF752894150400B8D037 /* getarg.c */; };
 		5908C06D2894150400B8D037 /* openbsd-reallocarray.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BF792894150400B8D037 /* openbsd-reallocarray.c */; };
 		5908C06E2894150400B8D037 /* gifalloc.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BF7A2894150400B8D037 /* gifalloc.c */; };
 		5908C0752894150400B8D037 /* quantize.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BFAE2894150400B8D037 /* quantize.c */; };
 		5908C0762894150400B8D037 /* gif_hash.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BFB02894150400B8D037 /* gif_hash.c */; };
-		5908C0772894150400B8D037 /* gif_font.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BFB22894150400B8D037 /* gif_font.c */; };
 		5908C07A2894150400B8D037 /* gif_err.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908C00E2894150400B8D037 /* gif_err.c */; };
 /* End PBXBuildFile section */
 
@@ -184,17 +181,13 @@
 				59CE4EFA2897D23400F57515 /* main */,
 				5908BF6E2894150400B8D037 /* dgif_lib.c */,
 				5908BF6D2894150400B8D037 /* egif_lib.c */,
-				5908BF752894150400B8D037 /* getarg.c */,
-				5908BFB12894150400B8D037 /* getarg.h */,
 				5908C00E2894150400B8D037 /* gif_err.c */,
-				5908BFB22894150400B8D037 /* gif_font.c */,
 				5908BFB02894150400B8D037 /* gif_hash.c */,
 				5908BF712894150400B8D037 /* gif_hash.h */,
 				5908BF772894150400B8D037 /* gif_lib_private.h */,
 				5908C00D2894150400B8D037 /* gif_lib.h */,
 				5908BF7A2894150400B8D037 /* gifalloc.c */,
 				5908BF792894150400B8D037 /* openbsd-reallocarray.c */,
-				5908BF732894150400B8D037 /* qprintf.c */,
 				5908BFAE2894150400B8D037 /* quantize.c */,
 			);
 			path = "giflib-5.2.1";
@@ -203,6 +196,9 @@
 		59CE4EFA2897D23400F57515 /* main */ = {
 			isa = PBXGroup;
 			children = (
+				5908BFB22894150400B8D037 /* gif_font.c */,
+				5908BF752894150400B8D037 /* getarg.c */,
+				5908BFB12894150400B8D037 /* getarg.h */,
 				5908C0102894150400B8D037 /* gif2rgb.c */,
 				5908BFA02894150400B8D037 /* gifbg.c */,
 				5908BF9F2894150400B8D037 /* gifbuild.c */,
@@ -217,6 +213,7 @@
 				5908BFAC2894150400B8D037 /* giftext.c */,
 				5908BF702894150400B8D037 /* giftool.c */,
 				5908BF9D2894150400B8D037 /* gifwedge.c */,
+				5908BF732894150400B8D037 /* qprintf.c */,
 			);
 			name = main;
 			sourceTree = "<group>";
@@ -291,12 +288,9 @@
 				5908C0762894150400B8D037 /* gif_hash.c in Sources */,
 				5908C0632894150400B8D037 /* pngrutil.c in Sources */,
 				5908C0532894150400B8D037 /* pngpread.c in Sources */,
-				5908C0772894150400B8D037 /* gif_font.c in Sources */,
 				5908C0622894150400B8D037 /* pngrtran.c in Sources */,
 				5908BD522894142100B8D037 /* main.cpp in Sources */,
-				5908C0692894150400B8D037 /* qprintf.c in Sources */,
 				5908C0192894150400B8D037 /* pngrio.c in Sources */,
-				5908C06B2894150400B8D037 /* getarg.c in Sources */,
 				5908C0752894150400B8D037 /* quantize.c in Sources */,
 				5908C01E2894150400B8D037 /* pngtrans.c in Sources */,
 				5908C07A2894150400B8D037 /* gif_err.c in Sources */,

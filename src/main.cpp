@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include "../lib/libpng-1.6.37/png.h"
+#include "../lib/giflib-5.2.1/gif_lib.h"
 #include <unistd.h>
 
 bool writePng(const char* name, int w, int h, const void* data) {
@@ -60,6 +61,104 @@ struct RGBA {
     uint8_t r,g,b,a;
 };
 
+void printGIFError(const char* name, int err) {
+    printf("gif: %s: error: %d(%s)", name, err, GifErrorString(err));
+}
+
+bool readGIF_file(GifFileType* GifFile) {
+    printf("w: %d, h: %d\n", GifFile->SWidth, GifFile->SHeight);
+    if (GifFile->SHeight == 0 || GifFile->SWidth == 0) {
+        fprintf(stderr, "Image of width or height 0\n");
+        return false;
+    }
+    int ImageNum = 0;
+    GifRecordType RecordType;
+    do {
+        if (DGifGetRecordType(GifFile, &RecordType) == GIF_ERROR) {
+            printGIFError("record", GifFile->Error);
+            return false;
+        }
+        switch (RecordType) {
+            case IMAGE_DESC_RECORD_TYPE:
+                if (DGifGetImageDesc(GifFile) == GIF_ERROR) {
+                    printGIFError("desc", GifFile->Error);
+                    return false;
+                }
+                ++ImageNum;
+                printf("Image: (%d, %d), (%d, %d)\n", GifFile->Image.Top, GifFile->Image.Left, GifFile->Image.Width, GifFile->Image.Height);
+                if (GifFile->Image.Left + GifFile->Image.Width > GifFile->SWidth ||
+                   GifFile->Image.Top + GifFile->Image.Height > GifFile->SHeight) {
+                    fprintf(stderr, "Image %d is not confined to screen dimension, aborted.\n", ImageNum);
+                    return false;
+                }
+                if (GifFile->Image.Interlace) {
+                    /* Need to perform 4 passes on the images: */
+#if 0
+                    for (Count = i = 0; i < 4; i++) {
+                        for (j = Row + InterlacedOffset[i]; j < Row + Height;
+                                     j += InterlacedJumps[i]) {
+                            GifQprintf("\b\b\b\b%-4d", Count++);
+                            if (DGifGetLine(GifFile, &ScreenBuffer[j][Col],
+                            Width) == GIF_ERROR) {
+                            PrintGifError(GifFile->Error);
+                            exit(EXIT_FAILURE);
+                            }
+                        }
+                    }
+#endif//0
+                } else {
+#if 0
+                    for (i = 0; i < Height; i++) {
+                        GifQprintf("\b\b\b\b%-4d", i);
+                        if (DGifGetLine(GifFile, &ScreenBuffer[Row++][Col],
+                            Width) == GIF_ERROR) {
+                            PrintGifError(GifFile->Error);
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+#endif//0
+                }
+                break;
+            case EXTENSION_RECORD_TYPE: {
+                GifByteType *Extension;
+                int ExtCode;
+                /* Skip any extension blocks in file: */
+                if (DGifGetExtension(GifFile, &ExtCode, &Extension) == GIF_ERROR) {
+                    printGIFError("extension", GifFile->Error);
+                    return false;
+                }
+                while (Extension != NULL) {
+                    if (DGifGetExtensionNext(GifFile, &Extension) == GIF_ERROR) {
+                        printGIFError("extension next", GifFile->Error);
+                        return false;
+                    }
+                }
+                break; }
+            case TERMINATE_RECORD_TYPE:
+                break;
+            default:            /* Should be trapped by DGifGetRecordType. */
+                break;
+        }
+    } while (RecordType != TERMINATE_RECORD_TYPE);
+    
+    return true;
+}
+
+bool readGIF(const char* name) {
+    int Error;
+    GifFileType* GifFile = DGifOpenFileName(name, &Error);
+    if (!GifFile) {
+        printGIFError("open", Error);
+        return false;
+    }
+    GifRowType* ScreenBuffer = nullptr;
+    bool success = readGIF_file(GifFile);
+    if (DGifCloseFile(GifFile, &Error) == GIF_ERROR) {
+        printGIFError("close", Error);
+    }
+    return true;
+}
+
 int main(int argc, const char * argv[]) {
     RGBA data[4*4];
     
@@ -72,8 +171,9 @@ int main(int argc, const char * argv[]) {
     
     char cwd[1024];
     printf("cwd: %s\n", getcwd(cwd, 1024));
-        
     writePng("test.png", 4, 4, data);
+    
+    readGIF("1.gif");
     
     return 0;
 }
