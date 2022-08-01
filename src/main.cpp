@@ -73,10 +73,14 @@ bool readGIF_file(GifFileType* GifFile) {
     }
     int ImageNum = 0;
     GifRecordType RecordType;
-    do {
+    while (1) {
         if (DGifGetRecordType(GifFile, &RecordType) == GIF_ERROR) {
             printGIFError("record", GifFile->Error);
             return false;
+        }
+        printf("record: %d\n", RecordType);
+        if (RecordType == TERMINATE_RECORD_TYPE) {
+            break;
         }
         switch (RecordType) {
             case IMAGE_DESC_RECORD_TYPE:
@@ -139,7 +143,7 @@ bool readGIF_file(GifFileType* GifFile) {
             default:            /* Should be trapped by DGifGetRecordType. */
                 break;
         }
-    } while (RecordType != TERMINATE_RECORD_TYPE);
+    }
     
     return true;
 }

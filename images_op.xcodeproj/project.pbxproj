@@ -30,6 +30,7 @@
 		5908C0752894150400B8D037 /* quantize.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BFAE2894150400B8D037 /* quantize.c */; };
 		5908C0762894150400B8D037 /* gif_hash.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908BFB02894150400B8D037 /* gif_hash.c */; };
 		5908C07A2894150400B8D037 /* gif_err.c in Sources */ = {isa = PBXBuildFile; fileRef = 5908C00E2894150400B8D037 /* gif_err.c */; };
+		59CE4F062897F69900F57515 /* gif.c in Sources */ = {isa = PBXBuildFile; fileRef = 59CE4F052897F69900F57515 /* gif.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -98,6 +99,8 @@
 		5908C0152894150400B8D037 /* giffilter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = giffilter.c; sourceTree = "<group>"; };
 		59CE4EF82897D14D00F57515 /* pnglibconf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = pnglibconf.h; sourceTree = "<group>"; };
 		59CE4EF92897D15D00F57515 /* config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = config.h; sourceTree = "<group>"; };
+		59CE4F042897F69900F57515 /* gif.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = gif.h; sourceTree = "<group>"; };
+		59CE4F052897F69900F57515 /* gif.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = gif.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +142,7 @@
 		5908BD582894150200B8D037 /* lib */ = {
 			isa = PBXGroup;
 			children = (
+				59CE4F032897F66100F57515 /* from_ImageMagick */,
 				5908BD592894150200B8D037 /* libpng-1.6.37 */,
 				5908BF6C2894150400B8D037 /* giflib-5.2.1 */,
 			);
@@ -218,6 +222,15 @@
 			name = main;
 			sourceTree = "<group>";
 		};
+		59CE4F032897F66100F57515 /* from_ImageMagick */ = {
+			isa = PBXGroup;
+			children = (
+				59CE4F052897F69900F57515 /* gif.c */,
+				59CE4F042897F69900F57515 /* gif.h */,
+			);
+			path = from_ImageMagick;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -287,6 +300,7 @@
 				5908C0602894150400B8D037 /* pngget.c in Sources */,
 				5908C0762894150400B8D037 /* gif_hash.c in Sources */,
 				5908C0632894150400B8D037 /* pngrutil.c in Sources */,
+				59CE4F062897F69900F57515 /* gif.c in Sources */,
 				5908C0532894150400B8D037 /* pngpread.c in Sources */,
 				5908C0622894150400B8D037 /* pngrtran.c in Sources */,
 				5908BD522894142100B8D037 /* main.cpp in Sources */,
