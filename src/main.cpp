@@ -9,6 +9,8 @@
 #include "../lib/libpng-1.6.37/png.h"
 #include "../lib/giflib-5.2.1/gif_lib.h"
 #include <unistd.h>
+#include <memory>
+#include <string>
 
 bool writePng(const char* name, int w, int h, const void* data) {
     FILE *fp = fopen(name, "wb");
@@ -148,6 +150,35 @@ bool readGIF_file(GifFileType* GifFile) {
     return true;
 }
 
+void saveGIFFrames(GifFileType* GifFile, const char* name) {
+    std::unique_ptr<RGBA[]> image(new RGBA[GifFile->SWidth * GifFile->SHeight]);
+    for (int i = 0; i < GifFile->ImageCount; ++i) {
+        /* Lets dump it - set the global variables required and do it: */
+        auto ColorMap = (GifFile->Image.ColorMap ? GifFile->Image.ColorMap : GifFile->SColorMap);
+        if (ColorMap == NULL) {
+            fprintf(stderr, "Gif Image does not have a colormap\n");
+            continue;
+        }
+        
+        /* check that the background color isn't garbage (SF bug #87) */
+        auto bgColor = GifFile->SBackGroundColor;
+        if (bgColor < 0 || bgColor >= ColorMap->ColorCount) {
+            fprintf(stderr, "Background color out of range for colormap\n");
+            bgColor = 0;
+        }
+        
+        
+        
+        std::string newName = name;
+        char buf[32];
+        sprintf(buf, "%d", i);
+        newName.append(buf);
+        newName.append(".png");
+        
+        
+    }
+}
+
 bool readGIF(const char* name) {
     int Error;
     GifFileType* GifFile = DGifOpenFileName(name, &Error);
@@ -155,8 +186,20 @@ bool readGIF(const char* name) {
         printGIFError("open", Error);
         return false;
     }
-    GifRowType* ScreenBuffer = nullptr;
-    bool success = readGIF_file(GifFile);
+    printf("w: %d, h: %d\n", GifFile->SWidth, GifFile->SHeight);
+    if (GifFile->SHeight == 0 || GifFile->SWidth == 0) {
+        fprintf(stderr, "Image of width or height 0\n");
+        return false;
+    }
+    Error = DGifSlurp(GifFile);
+    if (Error == GIF_OK) {
+        saveGIFFrames(GifFile, name);
+        for (int i = 0; i < GifFile->ImageCount; ++i) {
+            
+        }
+    } else {
+        printGIFError("slurp", Error);
+    }
     if (DGifCloseFile(GifFile, &Error) == GIF_ERROR) {
         printGIFError("close", Error);
     }
