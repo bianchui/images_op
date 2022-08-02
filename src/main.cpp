@@ -152,22 +152,62 @@ bool readGIF_file(GifFileType* GifFile) {
 
 void saveGIFFrames(GifFileType* GifFile, const char* name) {
     std::unique_ptr<RGBA[]> image(new RGBA[GifFile->SWidth * GifFile->SHeight]);
+    const int width = GifFile->SWidth, height = GifFile->SHeight;
     for (int i = 0; i < GifFile->ImageCount; ++i) {
+        const auto& img = GifFile->SavedImages[i];
+        
         /* Lets dump it - set the global variables required and do it: */
-        auto ColorMap = (GifFile->Image.ColorMap ? GifFile->Image.ColorMap : GifFile->SColorMap);
+        auto ColorMap = (img.ImageDesc.ColorMap ? img.ImageDesc.ColorMap : GifFile->SColorMap);
         if (ColorMap == NULL) {
             fprintf(stderr, "Gif Image does not have a colormap\n");
             continue;
         }
         
         /* check that the background color isn't garbage (SF bug #87) */
-        auto bgColor = GifFile->SBackGroundColor;
-        if (bgColor < 0 || bgColor >= ColorMap->ColorCount) {
+        auto bgColorIndex = GifFile->SBackGroundColor;
+        if (bgColorIndex < 0 || bgColorIndex >= ColorMap->ColorCount) {
             fprintf(stderr, "Background color out of range for colormap\n");
-            bgColor = 0;
+            bgColorIndex = 0;
         }
         
-        
+        GraphicsControlBlock gcb;
+        const bool hasGCB = DGifSavedExtensionToGCB(GifFile, i, &gcb);
+        const int transparentColor = hasGCB ? gcb.TransparentColor : NO_TRANSPARENT_COLOR;
+
+        GifColorType bgColor = ColorMap->Colors[bgColorIndex];
+        GifByteType bgColorA = transparentColor != bgColorIndex ? 255 : 0;
+        int y = 0;
+        for (; y < img.ImageDesc.Top; ++y) {
+            auto line = image.get() + y * width;
+            for (int x = 0; x < width; x++) {
+                auto& rgba = line[x];
+                rgba.r = bgColor.Red;
+                rgba.g = bgColor.Green;
+                rgba.b = bgColor.Blue;
+                rgba.a = bgColorA;
+            }
+        }
+        for (int y = 0; y < GifFile->SHeight; ++y) {
+            for (int x = 0; x < )
+            for (int x = 0; x < GifFile->SWidth ; x++) {
+                ColorMapEntry = &ColorMap->Colors[GifRow[j]];
+                *BufferP++ = ColorMapEntry->Red;
+                *BufferP++ = ColorMapEntry->Green;
+                *BufferP++ = ColorMapEntry->Blue;
+            }
+            if (fwrite(Buffer, ScreenWidth * 3, 1, rgbfp[0]) != 1)
+                GIF_EXIT("Write to file(s) failed.");
+        }
+        for (; y < height; ++y) {
+            auto line = image.get() + y * width;
+            for (int x = 0; x < width; x++) {
+                auto& rgba = line[x];
+                rgba.r = bgColor.Red;
+                rgba.g = bgColor.Green;
+                rgba.b = bgColor.Blue;
+                rgba.a = bgColorA;
+            }
+        }
         
         std::string newName = name;
         char buf[32];
