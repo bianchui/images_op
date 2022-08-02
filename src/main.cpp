@@ -67,89 +67,6 @@ void printGIFError(const char* name, int err) {
     printf("gif: %s: error: %d(%s)", name, err, GifErrorString(err));
 }
 
-bool readGIF_file(GifFileType* GifFile) {
-    printf("w: %d, h: %d\n", GifFile->SWidth, GifFile->SHeight);
-    if (GifFile->SHeight == 0 || GifFile->SWidth == 0) {
-        fprintf(stderr, "Image of width or height 0\n");
-        return false;
-    }
-    int ImageNum = 0;
-    GifRecordType RecordType;
-    while (1) {
-        if (DGifGetRecordType(GifFile, &RecordType) == GIF_ERROR) {
-            printGIFError("record", GifFile->Error);
-            return false;
-        }
-        printf("record: %d\n", RecordType);
-        if (RecordType == TERMINATE_RECORD_TYPE) {
-            break;
-        }
-        switch (RecordType) {
-            case IMAGE_DESC_RECORD_TYPE:
-                if (DGifGetImageDesc(GifFile) == GIF_ERROR) {
-                    printGIFError("desc", GifFile->Error);
-                    return false;
-                }
-                ++ImageNum;
-                printf("Image: (%d, %d), (%d, %d)\n", GifFile->Image.Top, GifFile->Image.Left, GifFile->Image.Width, GifFile->Image.Height);
-                if (GifFile->Image.Left + GifFile->Image.Width > GifFile->SWidth ||
-                   GifFile->Image.Top + GifFile->Image.Height > GifFile->SHeight) {
-                    fprintf(stderr, "Image %d is not confined to screen dimension, aborted.\n", ImageNum);
-                    return false;
-                }
-                if (GifFile->Image.Interlace) {
-                    /* Need to perform 4 passes on the images: */
-#if 0
-                    for (Count = i = 0; i < 4; i++) {
-                        for (j = Row + InterlacedOffset[i]; j < Row + Height;
-                                     j += InterlacedJumps[i]) {
-                            GifQprintf("\b\b\b\b%-4d", Count++);
-                            if (DGifGetLine(GifFile, &ScreenBuffer[j][Col],
-                            Width) == GIF_ERROR) {
-                            PrintGifError(GifFile->Error);
-                            exit(EXIT_FAILURE);
-                            }
-                        }
-                    }
-#endif//0
-                } else {
-#if 0
-                    for (i = 0; i < Height; i++) {
-                        GifQprintf("\b\b\b\b%-4d", i);
-                        if (DGifGetLine(GifFile, &ScreenBuffer[Row++][Col],
-                            Width) == GIF_ERROR) {
-                            PrintGifError(GifFile->Error);
-                            exit(EXIT_FAILURE);
-                        }
-                    }
-#endif//0
-                }
-                break;
-            case EXTENSION_RECORD_TYPE: {
-                GifByteType *Extension;
-                int ExtCode;
-                /* Skip any extension blocks in file: */
-                if (DGifGetExtension(GifFile, &ExtCode, &Extension) == GIF_ERROR) {
-                    printGIFError("extension", GifFile->Error);
-                    return false;
-                }
-                while (Extension != NULL) {
-                    if (DGifGetExtensionNext(GifFile, &Extension) == GIF_ERROR) {
-                        printGIFError("extension next", GifFile->Error);
-                        return false;
-                    }
-                }
-                break; }
-            case TERMINATE_RECORD_TYPE:
-                break;
-            default:            /* Should be trapped by DGifGetRecordType. */
-                break;
-        }
-    }
-    
-    return true;
-}
-
 void saveGIFFrames(GifFileType* GifFile, const char* name) {
     std::unique_ptr<RGBA[]> image(new RGBA[GifFile->SWidth * GifFile->SHeight]);
     const int width = GifFile->SWidth, height = GifFile->SHeight;
@@ -157,7 +74,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         const auto& img = GifFile->SavedImages[i];
         
         /* Lets dump it - set the global variables required and do it: */
-        auto ColorMap = (img.ImageDesc.ColorMap ? img.ImageDesc.ColorMap : GifFile->SColorMap);
+        const auto ColorMap = (img.ImageDesc.ColorMap ? img.ImageDesc.ColorMap : GifFile->SColorMap);
         if (ColorMap == NULL) {
             fprintf(stderr, "Gif Image does not have a colormap\n");
             continue;
@@ -174,38 +91,50 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         const bool hasGCB = DGifSavedExtensionToGCB(GifFile, i, &gcb);
         const int transparentColor = hasGCB ? gcb.TransparentColor : NO_TRANSPARENT_COLOR;
 
-        GifColorType bgColor = ColorMap->Colors[bgColorIndex];
-        GifByteType bgColorA = transparentColor != bgColorIndex ? 255 : 0;
-        int y = 0;
-        for (; y < img.ImageDesc.Top; ++y) {
+        const GifColorType bgColor = ColorMap->Colors[bgColorIndex];
+        const GifByteType bgColorA = transparentColor != bgColorIndex ? 255 : 0;
+
+        const int startX = std::min(img.ImageDesc.Left, width);
+        const int endX = std::min(startX + img.ImageDesc.Width, width);
+        const int startY = std::min(img.ImageDesc.Top, height);
+        const int endY = std::min(startY + img.ImageDesc.Height, height);
+
+        const RGBA bgRGBA = {
+            .r = bgColor.Red,
+            .g = bgColor.Green,
+            .b = bgColor.Blue,
+            .a = bgColorA,
+        };
+
+        for (int y = 0; y < startY; ++y) {
             auto line = image.get() + y * width;
             for (int x = 0; x < width; x++) {
-                auto& rgba = line[x];
-                rgba.r = bgColor.Red;
-                rgba.g = bgColor.Green;
-                rgba.b = bgColor.Blue;
-                rgba.a = bgColorA;
+                line[x] = bgRGBA;
             }
         }
-        for (int y = 0; y < GifFile->SHeight; ++y) {
-            for (int x = 0; x < )
-            for (int x = 0; x < GifFile->SWidth ; x++) {
-                ColorMapEntry = &ColorMap->Colors[GifRow[j]];
-                *BufferP++ = ColorMapEntry->Red;
-                *BufferP++ = ColorMapEntry->Green;
-                *BufferP++ = ColorMapEntry->Blue;
+        for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
+            auto line = image.get() + (y + startY) * width;
+            for (int x = 0; x < startX; ++x) {
+                line[x] = bgRGBA;
             }
-            if (fwrite(Buffer, ScreenWidth * 3, 1, rgbfp[0]) != 1)
-                GIF_EXIT("Write to file(s) failed.");
+            auto subLine = line + startX;
+            auto gifLine = img.RasterBits + y * img.ImageDesc.Width;
+            for (int x = 0, subWidth = endX - startX; x < subWidth; ++x) {
+                auto* pixel = subLine + x;
+                const auto* color = ColorMap->Colors + gifLine[x];
+                pixel->r = color->Red;
+                pixel->g = color->Green;
+                pixel->b = color->Blue;
+                pixel->a = gifLine[x] == transparentColor ? 0 : 255;
+            }
+            for (int x = endX; x < width; ++x) {
+                line[x] = bgRGBA;
+            }
         }
-        for (; y < height; ++y) {
+        for (int y = endY; y < height; ++y) {
             auto line = image.get() + y * width;
             for (int x = 0; x < width; x++) {
-                auto& rgba = line[x];
-                rgba.r = bgColor.Red;
-                rgba.g = bgColor.Green;
-                rgba.b = bgColor.Blue;
-                rgba.a = bgColorA;
+                line[x] = bgRGBA;
             }
         }
         
@@ -215,7 +144,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         newName.append(buf);
         newName.append(".png");
         
-        
+        writePng(newName.c_str(), width, height, image.get());
     }
 }
 
@@ -261,6 +190,7 @@ int main(int argc, const char * argv[]) {
     writePng("test.png", 4, 4, data);
     
     readGIF("1.gif");
-    
+    readGIF("2.gif");
+
     return 0;
 }
