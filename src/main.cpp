@@ -78,6 +78,21 @@ void saveSubImage(const char* name, int i, int width, int height, const void* im
     writePng(newName.c_str(), width, height, image);
 }
 
+GifColorType getBGColor(GifFileType* GifFile, const SavedImage& img) {
+    auto bgColorIndex = GifFile->SBackGroundColor;
+    auto* ColorMap = img.ImageDesc.ColorMap;
+    if (ColorMap && bgColorIndex < ColorMap->ColorCount) {
+        return ColorMap->Colors[bgColorIndex];
+    }
+    
+    if (GifFile->SColorMap && bgColorIndex < GifFile->SColorMap->ColorCount) {
+        return GifFile->SColorMap->Colors[bgColorIndex];
+    }
+    fprintf(stderr, "Background color out of range for colormap\n");
+
+    return ColorMap ? ColorMap->Colors[0] : GifFile->SColorMap->Colors[0];
+}
+
 // https://docstore.mik.ua/orelly/web2/wdesign/ch23_05.htm
 void saveGIFFrames(GifFileType* GifFile, const char* name) {
     std::vector<std::shared_ptr<RGBA[]>> images;
@@ -102,21 +117,12 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             continue;
         }
         
-        /* check that the background color isn't garbage (SF bug #87) */
-        auto bgColorIndex = GifFile->SBackGroundColor;
-        if (bgColorIndex < 0 || bgColorIndex >= ColorMap->ColorCount) {
-            if (!imgPrepared) {
-                fprintf(stderr, "Background color out of range for colormap\n");
-            }
-            bgColorIndex = 0;
-        }
-        
         GraphicsControlBlock gcb;
         const bool hasGCB = DGifSavedExtensionToGCB(GifFile, i, &gcb);
         const int transparentColor = hasGCB ? gcb.TransparentColor : NO_TRANSPARENT_COLOR;
 
-        const GifColorType bgColor = ColorMap->Colors[bgColorIndex];
-        const GifByteType bgColorA = transparentColor != bgColorIndex ? 255 : 0;
+        const GifColorType bgColor = getBGColor(GifFile, img);
+        const GifByteType bgColorA = transparentColor != GifFile->SBackGroundColor ? 255 : 0;
 
         const int startX = std::min(img.ImageDesc.Left, width);
         const int endX = std::min(startX + img.ImageDesc.Width, width);
@@ -131,8 +137,13 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         };
  
         if (!imgPrepared) {
+            auto line0 = image.get();
             for (int y = 0; y < startY; ++y) {
                 auto line = image.get() + y * width;
+                if (y != 0) {
+                    memcpy(line, line0, width * sizeof(RGBA));
+                    continue;
+                }
                 for (int x = 0; x < width; x++) {
                     line[x] = bgRGBA;
                 }
@@ -166,8 +177,13 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             }
         }
         if (!imgPrepared) {
+            auto line0 = image.get() + endY * width;
             for (int y = endY; y < height; ++y) {
                 auto line = image.get() + y * width;
+                if (y != endY) {
+                    memcpy(line, line0, width * sizeof(RGBA));
+                    continue;
+                }
                 for (int x = 0; x < width; x++) {
                     line[x] = bgRGBA;
                 }
@@ -268,6 +284,7 @@ int main(int argc, const char * argv[]) {
     //readGIF("3.gif");
     //readGIF("4.gif");
     
+    // test images from https://legacy.imagemagick.org/Usage/anim_basics/
     readGIF("img/anim_bgnd.gif");
     readGIF("img/anim_none.gif");
     readGIF("img/canvas_bgnd.gif");
