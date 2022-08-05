@@ -106,9 +106,8 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             saveSubImage(name, i + 100, width, height, image);
             imgPrepared = true;
         } else {
-            std::unique_ptr<RGBA[]> ref(new RGBA[width * height]);
-            image = ref.get();
-            images.push_back(std::move(ref));
+            image = new RGBA[width * height];
+            images.push_back(std::unique_ptr<RGBA[]>(image));
         }
         const auto& img = GifFile->SavedImages[i];
         
@@ -220,9 +219,8 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         
         if (needCopy) {
             // copy to next image
-            std::unique_ptr<RGBA[]> ref(new RGBA[width * height]);
-            RGBA* nextImage = ref.get();
-            images.push_back(std::move(ref));
+            RGBA* nextImage = new RGBA[width * height];
+            images.push_back(std::unique_ptr<RGBA[]>(nextImage));
             memcpy(nextImage, fromImage, width * height * sizeof(RGBA));
             if (disposalMode == DISPOSE_BACKGROUND) {
                 for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
