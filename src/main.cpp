@@ -115,6 +115,15 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
     const int width = GifFile->SWidth, height = GifFile->SHeight;
     int doNotDispose = -1;
     for (int srcI = 0, dstI = 0; srcI < GifFile->ImageCount; ++srcI) {
+        const auto& src = GifFile->SavedImages[srcI];
+        
+        /* Lets dump it - set the global variables required and do it: */
+        const auto ColorMap = (src.ImageDesc.ColorMap ? src.ImageDesc.ColorMap : GifFile->SColorMap);
+        if (ColorMap == NULL) {
+            fprintf(stderr, "Gif Image does not have a colormap\n");
+            continue;
+        }
+        
         RGBA* image;
         bool imgPrepared = false;
         if (dstI < images.size()) {
@@ -125,26 +134,19 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             image = new RGBA[width * height];
             images.push_back(std::unique_ptr<RGBA[]>(image));
         }
-        const auto& img = GifFile->SavedImages[srcI];
-        
-        /* Lets dump it - set the global variables required and do it: */
-        const auto ColorMap = (img.ImageDesc.ColorMap ? img.ImageDesc.ColorMap : GifFile->SColorMap);
-        if (ColorMap == NULL) {
-            fprintf(stderr, "Gif Image does not have a colormap\n");
-            continue;
-        }
+        ++dstI;
         
         GraphicsControlBlock gcb;
         const bool hasGCB = DGifSavedExtensionToGCB(GifFile, srcI, &gcb);
         const int transparentColor = hasGCB ? gcb.TransparentColor : NO_TRANSPARENT_COLOR;
 
-        const GifColorType bgColor = getBGColor(GifFile, img);
+        const GifColorType bgColor = getBGColor(GifFile, src);
         const GifByteType bgColorA = transparentColor != GifFile->SBackGroundColor ? 255 : 0;
 
-        const int startX = std::min(img.ImageDesc.Left, width);
-        const int endX = std::min(startX + img.ImageDesc.Width, width);
-        const int startY = std::min(img.ImageDesc.Top, height);
-        const int endY = std::min(startY + img.ImageDesc.Height, height);
+        const int startX = std::min(src.ImageDesc.Left, width);
+        const int endX = std::min(startX + src.ImageDesc.Width, width);
+        const int startY = std::min(src.ImageDesc.Top, height);
+        const int endY = std::min(startY + src.ImageDesc.Height, height);
 
         const RGBA bgRGBA = {
             .r = bgColor.Red,
@@ -174,7 +176,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
                 }
             }
             auto subLine = line + startX;
-            auto gifLine = img.RasterBits + y * img.ImageDesc.Width;
+            auto gifLine = src.RasterBits + y * src.ImageDesc.Width;
             for (int x = 0, subWidth = endX - startX; x < subWidth; ++x) {
                 const auto colorIndex = gifLine[x];
                 if (colorIndex == transparentColor && imgPrepared) {
@@ -220,7 +222,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         switch (disposalMode) {
             case DISPOSE_DO_NOT:
                 printf("%d: DISPOSE_DO_NOT\n", srcI);
-                doNotDispose = (int)images.size() - 1;
+                doNotDispose = (int)dstI - 1;
                 needCopy = true;
                 break;
             case DISPOSE_BACKGROUND:
@@ -241,7 +243,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
                 printf("%d: DISPOSAL_UNKNOWN\n", srcI);
                 break;
         }
-        
+
         if (needCopy) {
             // copy to next image
             RGBA* nextImage = new RGBA[width * height];
