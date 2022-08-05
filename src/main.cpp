@@ -78,11 +78,27 @@ void saveSubImage(const char* name, int i, int width, int height, const void* im
     writePng(newName.c_str(), width, height, image);
 }
 
-GifColorType getBGColor(GifFileType* GifFile, const SavedImage& img) {
+static const GifColorType kGIFWhite = {
+    .Red = 255,
+    .Green = 255,
+    .Blue = 255,
+};
+
+static const GifColorType kGIFBlack = {
+    .Red = 255,
+    .Green = 255,
+    .Blue = 255,
+};
+
+static GifColorType getBGColor(GifFileType* GifFile, const SavedImage& img) {
     auto bgColorIndex = GifFile->SBackGroundColor;
     auto* ColorMap = img.ImageDesc.ColorMap;
-    if (ColorMap && bgColorIndex < ColorMap->ColorCount) {
-        return ColorMap->Colors[bgColorIndex];
+    if (ColorMap) {
+        if (bgColorIndex < ColorMap->ColorCount) {
+            return ColorMap->Colors[bgColorIndex];
+        }
+        fprintf(stderr, "Background color out of range for colormap\n");
+        return kGIFWhite;
     }
     
     if (GifFile->SColorMap && bgColorIndex < GifFile->SColorMap->ColorCount) {
@@ -90,7 +106,7 @@ GifColorType getBGColor(GifFileType* GifFile, const SavedImage& img) {
     }
     fprintf(stderr, "Background color out of range for colormap\n");
 
-    return ColorMap ? ColorMap->Colors[0] : GifFile->SColorMap->Colors[0];
+    return kGIFWhite;
 }
 
 // https://docstore.mik.ua/orelly/web2/wdesign/ch23_05.htm
@@ -98,18 +114,18 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
     std::vector<std::unique_ptr<RGBA[]>> images;
     const int width = GifFile->SWidth, height = GifFile->SHeight;
     int doNotDispose = -1;
-    for (int i = 0; i < GifFile->ImageCount; ++i) {
+    for (int srcI = 0, dstI = 0; srcI < GifFile->ImageCount; ++srcI) {
         RGBA* image;
         bool imgPrepared = false;
-        if (i < images.size()) {
-            image = images[i].get();
-            saveSubImage(name, i + 100, width, height, image);
+        if (dstI < images.size()) {
+            image = images[dstI].get();
+            saveSubImage(name, dstI + 100, width, height, image);
             imgPrepared = true;
         } else {
             image = new RGBA[width * height];
             images.push_back(std::unique_ptr<RGBA[]>(image));
         }
-        const auto& img = GifFile->SavedImages[i];
+        const auto& img = GifFile->SavedImages[srcI];
         
         /* Lets dump it - set the global variables required and do it: */
         const auto ColorMap = (img.ImageDesc.ColorMap ? img.ImageDesc.ColorMap : GifFile->SColorMap);
@@ -119,7 +135,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         }
         
         GraphicsControlBlock gcb;
-        const bool hasGCB = DGifSavedExtensionToGCB(GifFile, i, &gcb);
+        const bool hasGCB = DGifSavedExtensionToGCB(GifFile, srcI, &gcb);
         const int transparentColor = hasGCB ? gcb.TransparentColor : NO_TRANSPARENT_COLOR;
 
         const GifColorType bgColor = getBGColor(GifFile, img);
@@ -169,7 +185,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
                 pixel->r = color->Red;
                 pixel->g = color->Green;
                 pixel->b = color->Blue;
-                pixel->a = gifLine[x] == transparentColor ? 0 : 255;
+                pixel->a = colorIndex == transparentColor ? 0 : 255;
             }
             if (!imgPrepared) {
                 for (int x = endX; x < width; ++x) {
@@ -191,9 +207,9 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             }
         }
         
-        saveSubImage(name, i, width, height, image);
+        saveSubImage(name, dstI, width, height, image);
                 
-        if (i >= GifFile->ImageCount) {
+        if (srcI >= GifFile->ImageCount) {
             break;
         }
 
@@ -201,20 +217,29 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
 
         RGBA* fromImage = image;
         bool needCopy = false;
-        if (disposalMode == DISPOSE_DO_NOT) {
-            doNotDispose = (int)images.size() - 1;
-            needCopy = true;
-        }
-        
-        if (disposalMode == DISPOSE_BACKGROUND) {
-            needCopy = true;
-        }
-        
-        if (disposalMode == DISPOSE_PREVIOUS) {
-            needCopy = true;
-            if (doNotDispose >= 0) {
-                fromImage = images[doNotDispose].get();
-            }
+        switch (disposalMode) {
+            case DISPOSE_DO_NOT:
+                printf("%d: DISPOSE_DO_NOT\n", srcI);
+                doNotDispose = (int)images.size() - 1;
+                needCopy = true;
+                break;
+            case DISPOSE_BACKGROUND:
+                printf("%d: DISPOSE_BACKGROUND\n", srcI);
+                needCopy = true;
+                break;
+            case DISPOSE_PREVIOUS:
+                printf("%d: DISPOSE_PREVIOUS\n", srcI);
+                needCopy = true;
+                if (doNotDispose >= 0) {
+                    fromImage = images[doNotDispose].get();
+                }
+                break;
+            case DISPOSAL_UNSPECIFIED:
+                printf("%d: DISPOSAL_UNSPECIFIED\n", srcI);
+                break;
+            default:
+                printf("%d: DISPOSAL_UNKNOWN\n", srcI);
+                break;
         }
         
         if (needCopy) {
@@ -239,6 +264,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
 }
 
 bool readGIF(const char* name) {
+    printf("%s\n", name);
     int Error;
     GifFileType* GifFile = DGifOpenFileName(name, &Error);
     if (!GifFile) {
