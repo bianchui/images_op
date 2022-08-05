@@ -84,29 +84,31 @@ static const GifColorType kGIFWhite = {
     .Blue = 255,
 };
 
+static const RGBA k_rgba_transparent = {0};
+
 static const GifColorType kGIFBlack = {
     .Red = 255,
     .Green = 255,
     .Blue = 255,
 };
 
-static GifColorType getBGColor(GifFileType* GifFile, const SavedImage& img) {
-    auto bgColorIndex = GifFile->SBackGroundColor;
-    auto* ColorMap = img.ImageDesc.ColorMap;
-    if (ColorMap) {
-        if (bgColorIndex < ColorMap->ColorCount) {
-            return ColorMap->Colors[bgColorIndex];
+// from https://android.googlesource.com/platform/frameworks/ex/+/refs/heads/master/framesequence/jni/FrameSequence_gif.cpp
+static RGBA gif_getBGColor(GifFileType* GifFile) {
+    RGBA color = k_rgba_transparent;
+    const ColorMapObject* cmap = GifFile->SColorMap;
+    if (cmap) {
+        // calculate bg color
+        GraphicsControlBlock gcb;
+        DGifSavedExtensionToGCB(GifFile, 0, &gcb);
+        if (gcb.TransparentColor == NO_TRANSPARENT_COLOR && GifFile->SBackGroundColor < cmap->ColorCount) {
+            auto gifColor = cmap->Colors[GifFile->SBackGroundColor];
+            color.r = gifColor.Red;
+            color.g = gifColor.Green;
+            color.b = gifColor.Blue;
+            color.a = 255;
         }
-        fprintf(stderr, "Background color out of range for colormap\n");
-        return kGIFWhite;
     }
-    
-    if (GifFile->SColorMap && bgColorIndex < GifFile->SColorMap->ColorCount) {
-        return GifFile->SColorMap->Colors[bgColorIndex];
-    }
-    fprintf(stderr, "Background color out of range for colormap\n");
-
-    return kGIFWhite;
+    return color;
 }
 
 // https://docstore.mik.ua/orelly/web2/wdesign/ch23_05.htm
@@ -114,6 +116,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
     std::vector<std::unique_ptr<RGBA[]>> images;
     const int width = GifFile->SWidth, height = GifFile->SHeight;
     int doNotDispose = -1;
+    const RGBA bgRGBA = gif_getBGColor(GifFile);
     for (int srcI = 0, dstI = 0; srcI < GifFile->ImageCount; ++srcI) {
         const auto& src = GifFile->SavedImages[srcI];
         
@@ -137,74 +140,62 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         ++dstI;
         
         GraphicsControlBlock gcb;
-        const bool hasGCB = DGifSavedExtensionToGCB(GifFile, srcI, &gcb);
-        const int transparentColor = hasGCB ? gcb.TransparentColor : NO_TRANSPARENT_COLOR;
-
-        const GifColorType bgColor = getBGColor(GifFile, src);
-        const GifByteType bgColorA = transparentColor != GifFile->SBackGroundColor ? 255 : 0;
+        DGifSavedExtensionToGCB(GifFile, srcI, &gcb);
+        const int transparentColor = gcb.TransparentColor;
 
         const int startX = std::min(src.ImageDesc.Left, width);
         const int endX = std::min(startX + src.ImageDesc.Width, width);
         const int startY = std::min(src.ImageDesc.Top, height);
         const int endY = std::min(startY + src.ImageDesc.Height, height);
-
-        const RGBA bgRGBA = {
-            .r = bgColor.Red,
-            .g = bgColor.Green,
-            .b = bgColor.Blue,
-            .a = bgColorA,
-        };
  
         if (!imgPrepared) {
-            auto line0 = image;
             for (int y = 0; y < startY; ++y) {
                 auto line = image + y * width;
-                if (y != 0) {
-                    memcpy(line, line0, width * sizeof(RGBA));
-                    continue;
-                }
-                for (int x = 0; x < width; x++) {
-                    line[x] = bgRGBA;
+                const auto end = line + width;
+                while (line < end) {
+                    *line++ = bgRGBA;
                 }
             }
         }
         for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
             auto line = image + (y + startY) * width;
+            auto end = line + startX;
             if (!imgPrepared) {
-                for (int x = 0; x < startX; ++x) {
-                    line[x] = bgRGBA;
+                while (line < end) {
+                    *line++ = bgRGBA;
                 }
             }
-            auto subLine = line + startX;
+            line = end;
             auto gifLine = src.RasterBits + y * src.ImageDesc.Width;
-            for (int x = 0, subWidth = endX - startX; x < subWidth; ++x) {
-                const auto colorIndex = gifLine[x];
-                if (colorIndex == transparentColor && imgPrepared) {
-                    continue;
+            end = line + src.ImageDesc.Width;
+            while (line < end) {
+                const auto colorIndex = *gifLine++;
+                if (colorIndex != transparentColor && colorIndex < ColorMap->ColorCount) {
+                    const auto* color = ColorMap->Colors + colorIndex;
+                    line->r = color->Red;
+                    line->g = color->Green;
+                    line->b = color->Blue;
+                    line->a = 255;
+                } else {
+                    if (!imgPrepared) {
+                        *line = k_rgba_transparent;
+                    }
                 }
-                auto* pixel = subLine + x;
-                const auto* color = ColorMap->Colors + colorIndex;
-                pixel->r = color->Red;
-                pixel->g = color->Green;
-                pixel->b = color->Blue;
-                pixel->a = colorIndex == transparentColor ? 0 : 255;
+                ++line;
             }
             if (!imgPrepared) {
+                auto line = image + y * width;
                 for (int x = endX; x < width; ++x) {
                     line[x] = bgRGBA;
                 }
             }
         }
         if (!imgPrepared) {
-            auto line0 = image + endY * width;
             for (int y = endY; y < height; ++y) {
                 auto line = image + y * width;
-                if (y != endY) {
-                    memcpy(line, line0, width * sizeof(RGBA));
-                    continue;
-                }
-                for (int x = 0; x < width; x++) {
-                    line[x] = bgRGBA;
+                const auto end = line + width;
+                while (line < end) {
+                    *line++ = bgRGBA;
                 }
             }
         }
@@ -215,11 +206,9 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             break;
         }
 
-        const int disposalMode = hasGCB ? gcb.DisposalMode : DISPOSAL_UNSPECIFIED;
-
         RGBA* fromImage = image;
         bool needCopy = false;
-        switch (disposalMode) {
+        switch (gcb.DisposalMode) {
             case DISPOSE_DO_NOT:
                 printf("%d: DISPOSE_DO_NOT\n", srcI);
                 doNotDispose = (int)dstI - 1;
@@ -249,7 +238,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             RGBA* nextImage = new RGBA[width * height];
             images.push_back(std::unique_ptr<RGBA[]>(nextImage));
             memcpy(nextImage, fromImage, width * height * sizeof(RGBA));
-            if (disposalMode == DISPOSE_BACKGROUND) {
+            if (gcb.DisposalMode == DISPOSE_BACKGROUND) {
                 for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
                     auto line = nextImage + (y + startY) * width;
                     auto subLine = line + startX;
@@ -307,17 +296,17 @@ int main(int argc, const char * argv[]) {
     printf("cwd: %s\n", getcwd(cwd, 1024));
     //writePng("test.png", 4, 4, data);
     
-    //readGIF("1.gif");
+    readGIF("img/1.gif");
     //readGIF("2.gif");
     //readGIF("3.gif");
     //readGIF("4.gif");
     
     // test images from https://legacy.imagemagick.org/Usage/anim_basics/
-    readGIF("img/anim_bgnd.gif");
-    readGIF("img/anim_none.gif");
-    readGIF("img/canvas_bgnd.gif");
-    readGIF("img/canvas_none.gif");
-    readGIF("img/canvas_prev.gif");
+    //readGIF("img/anim_bgnd.gif");
+    //readGIF("img/anim_none.gif");
+    //readGIF("img/canvas_bgnd.gif");
+    //readGIF("img/canvas_none.gif");
+    //readGIF("img/canvas_prev.gif");
 
     return 0;
 }
