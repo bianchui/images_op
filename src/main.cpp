@@ -60,10 +60,6 @@ bool writePng(const char* name, int w, int h, const void* data) {
     return success;
 }
 
-struct RGBA {
-    uint8_t r,g,b,a;
-};
-
 void printGIFError(const char* name, int err) {
     printf("gif: %s: error: %d(%s)", name, err, GifErrorString(err));
 }
@@ -78,19 +74,11 @@ void saveSubImage(const char* name, int i, int width, int height, const void* im
     writePng(newName.c_str(), width, height, image);
 }
 
-static const GifColorType kGIFWhite = {
-    .Red = 255,
-    .Green = 255,
-    .Blue = 255,
+struct RGBA {
+    uint8_t r,g,b,a;
 };
 
 static const RGBA k_rgba_transparent = {0};
-
-static const GifColorType kGIFBlack = {
-    .Red = 255,
-    .Green = 255,
-    .Blue = 255,
-};
 
 // from https://android.googlesource.com/platform/frameworks/ex/+/refs/heads/master/framesequence/jni/FrameSequence_gif.cpp
 static RGBA gif_getBGColor(GifFileType* GifFile) {
@@ -159,6 +147,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         }
         for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
             auto line = image + (y + startY) * width;
+            const auto lineEnd = line + width;
             auto end = line + startX;
             if (!imgPrepared) {
                 while (line < end) {
@@ -184,9 +173,8 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
                 ++line;
             }
             if (!imgPrepared) {
-                auto line = image + y * width;
-                for (int x = endX; x < width; ++x) {
-                    line[x] = bgRGBA;
+                while (line < lineEnd) {
+                    *line++ = bgRGBA;
                 }
             }
         }
@@ -200,7 +188,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             }
         }
         
-        saveSubImage(name, dstI, width, height, image);
+        saveSubImage(name, srcI, width, height, image);
                 
         if (srcI >= GifFile->ImageCount) {
             break;
@@ -296,17 +284,17 @@ int main(int argc, const char * argv[]) {
     printf("cwd: %s\n", getcwd(cwd, 1024));
     //writePng("test.png", 4, 4, data);
     
-    readGIF("img/1.gif");
+    //readGIF("img/1.gif");
     //readGIF("2.gif");
     //readGIF("3.gif");
-    //readGIF("4.gif");
+    //readGIF("img/4.gif");
     
     // test images from https://legacy.imagemagick.org/Usage/anim_basics/
-    //readGIF("img/anim_bgnd.gif");
-    //readGIF("img/anim_none.gif");
-    //readGIF("img/canvas_bgnd.gif");
-    //readGIF("img/canvas_none.gif");
-    //readGIF("img/canvas_prev.gif");
+    readGIF("img/anim_bgnd.gif");
+    readGIF("img/anim_none.gif");
+    readGIF("img/canvas_bgnd.gif");
+    readGIF("img/canvas_none.gif");
+    readGIF("img/canvas_prev.gif");
 
     return 0;
 }
