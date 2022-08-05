@@ -101,10 +101,12 @@ static RGBA gif_getBGColor(GifFileType* GifFile) {
 
 // https://docstore.mik.ua/orelly/web2/wdesign/ch23_05.htm
 void saveGIFFrames(GifFileType* GifFile, const char* name) {
-    std::vector<std::unique_ptr<RGBA[]>> images;
+    //std::vector<std::shared_ptr<RGBA[]>> images;
     const int width = GifFile->SWidth, height = GifFile->SHeight;
     int doNotDispose = -1;
     const RGBA bgRGBA = gif_getBGColor(GifFile);
+    std::shared_ptr<RGBA[]> doNotDisposeImageRef;
+    std::shared_ptr<RGBA[]> nextImageRef;
     for (int srcI = 0, dstI = 0; srcI < GifFile->ImageCount; ++srcI) {
         const auto& src = GifFile->SavedImages[srcI];
         
@@ -115,16 +117,19 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             continue;
         }
         
+        std::shared_ptr<RGBA[]> imageRef;
         RGBA* image;
         bool imgPrepared = false;
-        if (dstI < images.size()) {
-            image = images[dstI].get();
-            saveSubImage(name, dstI + 100, width, height, image);
+        if (/*dstI < images.size()*/nextImageRef.get()) {
+            imageRef = nextImageRef;
+            //image = images[dstI].get();
+            //saveSubImage(name, dstI + 100, width, height, image);
             imgPrepared = true;
         } else {
-            image = new RGBA[width * height];
-            images.push_back(std::unique_ptr<RGBA[]>(image));
+            imageRef = std::shared_ptr<RGBA[]>(new RGBA[width * height]);
+            //images.push_back(imageRef);
         }
+        image = imageRef.get();
         ++dstI;
         
         GraphicsControlBlock gcb;
@@ -135,6 +140,8 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         const int endX = std::min(startX + src.ImageDesc.Width, width);
         const int startY = std::min(src.ImageDesc.Top, height);
         const int endY = std::min(startY + src.ImageDesc.Height, height);
+        
+        printf("%d, %d, %d, %d\n", src.ImageDesc.Left, src.ImageDesc.Top, src.ImageDesc.Width, src.ImageDesc.Height);
  
         if (!imgPrepared) {
             for (int y = 0; y < startY; ++y) {
@@ -188,7 +195,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             }
         }
         
-        saveSubImage(name, srcI, width, height, image);
+        //saveSubImage(name, srcI, width, height, image);
                 
         if (srcI >= GifFile->ImageCount) {
             break;
@@ -199,6 +206,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         switch (gcb.DisposalMode) {
             case DISPOSE_DO_NOT:
                 printf("%d: DISPOSE_DO_NOT\n", srcI);
+                doNotDisposeImageRef = imageRef;
                 doNotDispose = (int)dstI - 1;
                 needCopy = true;
                 break;
@@ -210,7 +218,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
                 printf("%d: DISPOSE_PREVIOUS\n", srcI);
                 needCopy = true;
                 if (doNotDispose >= 0) {
-                    fromImage = images[doNotDispose].get();
+                    fromImage = doNotDisposeImageRef.get();
                 }
                 break;
             case DISPOSAL_UNSPECIFIED:
@@ -224,7 +232,8 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         if (needCopy) {
             // copy to next image
             RGBA* nextImage = new RGBA[width * height];
-            images.push_back(std::unique_ptr<RGBA[]>(nextImage));
+            nextImageRef = std::shared_ptr<RGBA[]>(nextImage);
+            //images.push_back(nextImageRef);
             memcpy(nextImage, fromImage, width * height * sizeof(RGBA));
             if (gcb.DisposalMode == DISPOSE_BACKGROUND) {
                 for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
@@ -235,6 +244,8 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
                     }
                 }
             }
+        } else {
+            nextImageRef.reset();
         }
     }
     if (true) {
@@ -288,13 +299,14 @@ int main(int argc, const char * argv[]) {
     //readGIF("2.gif");
     //readGIF("3.gif");
     //readGIF("img/4.gif");
-    
+    readGIF("img/5.gif");
+
     // test images from https://legacy.imagemagick.org/Usage/anim_basics/
-    readGIF("img/anim_bgnd.gif");
-    readGIF("img/anim_none.gif");
-    readGIF("img/canvas_bgnd.gif");
-    readGIF("img/canvas_none.gif");
-    readGIF("img/canvas_prev.gif");
+    //readGIF("img/anim_bgnd.gif");
+    //readGIF("img/anim_none.gif");
+    //readGIF("img/canvas_bgnd.gif");
+    //readGIF("img/canvas_none.gif");
+    //readGIF("img/canvas_prev.gif");
 
     return 0;
 }
