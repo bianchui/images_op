@@ -99,14 +99,16 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
     const int width = GifFile->SWidth, height = GifFile->SHeight;
     int doNotDispose = -1;
     for (int i = 0; i < GifFile->ImageCount; ++i) {
-        std::shared_ptr<RGBA[]> image;
+        RGBA* image;
         bool imgPrepared = false;
         if (i < images.size()) {
-            image = images[i];
-            saveSubImage(name, i + 100, width, height, image.get());
+            image = images[i].get();
+            saveSubImage(name, i + 100, width, height, image);
             imgPrepared = true;
         } else {
-            image = std::shared_ptr<RGBA[]>(new RGBA[width * height]);
+            std::shared_ptr<RGBA[]> ref(new RGBA[width * height]);
+            images.push_back(ref);
+            image = ref.get();
         }
         const auto& img = GifFile->SavedImages[i];
         
@@ -137,9 +139,9 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         };
  
         if (!imgPrepared) {
-            auto line0 = image.get();
+            auto line0 = image;
             for (int y = 0; y < startY; ++y) {
-                auto line = image.get() + y * width;
+                auto line = image + y * width;
                 if (y != 0) {
                     memcpy(line, line0, width * sizeof(RGBA));
                     continue;
@@ -150,7 +152,7 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             }
         }
         for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
-            auto line = image.get() + (y + startY) * width;
+            auto line = image + (y + startY) * width;
             if (!imgPrepared) {
                 for (int x = 0; x < startX; ++x) {
                     line[x] = bgRGBA;
@@ -177,9 +179,9 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             }
         }
         if (!imgPrepared) {
-            auto line0 = image.get() + endY * width;
+            auto line0 = image + endY * width;
             for (int y = endY; y < height; ++y) {
-                auto line = image.get() + y * width;
+                auto line = image + y * width;
                 if (y != endY) {
                     memcpy(line, line0, width * sizeof(RGBA));
                     continue;
@@ -190,19 +192,15 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             }
         }
         
-        saveSubImage(name, i, width, height, image.get());
-        
-        if (!imgPrepared) {
-            images.push_back(image);
-        }
-        
+        saveSubImage(name, i, width, height, image);
+                
         if (i >= GifFile->ImageCount) {
             break;
         }
 
         const int disposalMode = hasGCB ? gcb.DisposalMode : DISPOSAL_UNSPECIFIED;
 
-        std::shared_ptr<RGBA[]> fromImage = image;
+        RGBA* fromImage = image;
         bool needCopy = false;
         if (disposalMode == DISPOSE_DO_NOT) {
             doNotDispose = (int)images.size() - 1;
@@ -216,18 +214,19 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         if (disposalMode == DISPOSE_PREVIOUS) {
             needCopy = true;
             if (doNotDispose >= 0) {
-                fromImage = images[doNotDispose];
+                fromImage = images[doNotDispose].get();
             }
         }
         
         if (needCopy) {
             // copy to next image
-            std::shared_ptr<RGBA[]> nextImage = std::shared_ptr<RGBA[]>(new RGBA[GifFile->SWidth * GifFile->SHeight]);
-            images.push_back(nextImage);
-            memcpy(nextImage.get(), fromImage.get(), width * height * sizeof(RGBA));
+            std::shared_ptr<RGBA[]> ref(new RGBA[width * height]);
+            RGBA* nextImage = ref.get();
+            images.push_back(ref);
+            memcpy(nextImage, fromImage, width * height * sizeof(RGBA));
             if (disposalMode == DISPOSE_BACKGROUND) {
                 for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
-                    auto line = nextImage.get() + (y + startY) * width;
+                    auto line = nextImage + (y + startY) * width;
                     auto subLine = line + startX;
                     for (int x = 0, subWidth = endX - startX; x < subWidth; ++x) {
                         subLine[x] = bgRGBA;
@@ -235,6 +234,9 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
                 }
             }
         }
+    }
+    if (true) {
+        printf("done.");
     }
 }
 
