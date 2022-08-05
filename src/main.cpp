@@ -95,7 +95,7 @@ GifColorType getBGColor(GifFileType* GifFile, const SavedImage& img) {
 
 // https://docstore.mik.ua/orelly/web2/wdesign/ch23_05.htm
 void saveGIFFrames(GifFileType* GifFile, const char* name) {
-    std::vector<std::shared_ptr<RGBA[]>> images;
+    std::vector<std::unique_ptr<RGBA[]>> images;
     const int width = GifFile->SWidth, height = GifFile->SHeight;
     int doNotDispose = -1;
     for (int i = 0; i < GifFile->ImageCount; ++i) {
@@ -106,9 +106,9 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
             saveSubImage(name, i + 100, width, height, image);
             imgPrepared = true;
         } else {
-            std::shared_ptr<RGBA[]> ref(new RGBA[width * height]);
-            images.push_back(ref);
+            std::unique_ptr<RGBA[]> ref(new RGBA[width * height]);
             image = ref.get();
+            images.push_back(std::move(ref));
         }
         const auto& img = GifFile->SavedImages[i];
         
@@ -220,9 +220,9 @@ void saveGIFFrames(GifFileType* GifFile, const char* name) {
         
         if (needCopy) {
             // copy to next image
-            std::shared_ptr<RGBA[]> ref(new RGBA[width * height]);
+            std::unique_ptr<RGBA[]> ref(new RGBA[width * height]);
             RGBA* nextImage = ref.get();
-            images.push_back(ref);
+            images.push_back(std::move(ref));
             memcpy(nextImage, fromImage, width * height * sizeof(RGBA));
             if (disposalMode == DISPOSE_BACKGROUND) {
                 for (int y = 0, subheight = endY - startY; y < subheight; ++y) {
